@@ -202,6 +202,20 @@ func FromParameters(ctx context.Context, parameters map[string]interface{}) (sto
 		if err != nil {
 			return nil, err
 		}
+
+		if defaultCredentials, ok := parameters["defaultcredentials"]; ok {
+			defaultCredentialsMap, ok := defaultCredentials.(map[interface{}]interface{})
+			if !ok {
+				return nil, fmt.Errorf("The defaultcredentials were not provided in the correct format")
+			}
+
+			if emailParam, ok := defaultCredentialsMap["email"]; ok {
+				jwtConf.Email, ok = emailParam.(string)
+				if !ok {
+					return nil, fmt.Errorf("Invalid email, must be a string: %v", emailParam)
+				}
+			}
+		}
 	}
 
 	if userAgent, ok := parameters["useragent"]; ok {
@@ -785,10 +799,6 @@ func (d *driver) Delete(ctx context.Context, path string) error {
 // RedirectURL returns a URL which may be used to retrieve the content stored at
 // the given path, possibly using the given options.
 func (d *driver) RedirectURL(r *http.Request, path string) (string, error) {
-	if d.privateKey == nil {
-		return "", nil
-	}
-
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		return "", nil
 	}
