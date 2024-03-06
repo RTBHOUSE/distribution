@@ -63,6 +63,7 @@ var _ storagedriver.FileWriter = &writer{}
 // driverParameters is a struct that encapsulates all of the driver parameters after all values have been set
 type driverParameters struct {
 	bucket        string
+	redirect      bool
 	email         string
 	privateKey    []byte
 	client        *http.Client
@@ -96,6 +97,7 @@ var _ storagedriver.StorageDriver = &driver{}
 type driver struct {
 	client        *http.Client
 	bucket        *storage.BucketHandle
+	redirect      bool
 	email         string
 	privateKey    []byte
 	rootDirectory string
@@ -153,6 +155,7 @@ func FromParameters(ctx context.Context, parameters map[string]interface{}) (sto
 
 	var ts oauth2.TokenSource
 	jwtConf := new(jwt.Config)
+	redirect := false
 	var err error
 	var gcs *storage.Client
 	var options []option.ClientOption
@@ -165,6 +168,7 @@ func FromParameters(ctx context.Context, parameters map[string]interface{}) (sto
 		if err != nil {
 			return nil, err
 		}
+		redirect = true
 		ts = jwtConf.TokenSource(ctx)
 		options = append(options, option.WithCredentialsFile(fmt.Sprint(keyfile)))
 	} else if credentials, ok := parameters["credentials"]; ok {
@@ -191,6 +195,7 @@ func FromParameters(ctx context.Context, parameters map[string]interface{}) (sto
 		if err != nil {
 			return nil, err
 		}
+		redirect = true
 		ts = jwtConf.TokenSource(ctx)
 		options = append(options, option.WithCredentialsJSON(data))
 	} else {
@@ -201,6 +206,26 @@ func FromParameters(ctx context.Context, parameters map[string]interface{}) (sto
 		ts, err = google.DefaultTokenSource(ctx, storage.ScopeFullControl)
 		if err != nil {
 			return nil, err
+		}
+
+		if defaultCredentials, ok := parameters["defaultcredentials"]; ok {
+			defaultCredentialsMap, ok := defaultCredentials.(map[interface{}]interface{})
+			if !ok {
+				return nil, fmt.Errorf("The defaultcredentials were not provided in the correct format")
+			}
+
+			if redirectParam, ok := defaultCredentialsMap["redirect"]; ok {
+				redirect, ok = redirectParam.(bool)
+				if !ok {
+					return nil, fmt.Errorf("Invalid redirect, must be a boolean: %v", redirectParam)
+				}
+			}
+			if emailParam, ok := defaultCredentialsMap["email"]; ok {
+				jwtConf.Email, ok = emailParam.(string)
+				if !ok {
+					return nil, fmt.Errorf("Invalid email, must be a string: %v", emailParam)
+				}
+			}
 		}
 	}
 
@@ -223,6 +248,7 @@ func FromParameters(ctx context.Context, parameters map[string]interface{}) (sto
 	params := driverParameters{
 		bucket:         fmt.Sprint(bucket),
 		rootDirectory:  fmt.Sprint(rootDirectory),
+		redirect:       redirect,
 		email:          jwtConf.Email,
 		privateKey:     jwtConf.PrivateKey,
 		client:         oauth2.NewClient(ctx, ts),
@@ -246,6 +272,7 @@ func New(ctx context.Context, params driverParameters) (storagedriver.StorageDri
 	d := &driver{
 		bucket:        params.gcs.Bucket(params.bucket),
 		rootDirectory: rootDirectory,
+		redirect:      params.redirect,
 		email:         params.email,
 		privateKey:    params.privateKey,
 		client:        params.client,
@@ -785,7 +812,7 @@ func (d *driver) Delete(ctx context.Context, path string) error {
 // RedirectURL returns a URL which may be used to retrieve the content stored at
 // the given path, possibly using the given options.
 func (d *driver) RedirectURL(r *http.Request, path string) (string, error) {
-	if d.privateKey == nil {
+	if !d.redirect {
 		return "", nil
 	}
 

@@ -71,6 +71,7 @@ func init() {
 		parameters := driverParameters{
 			bucket:         bucket,
 			rootDirectory:  rootDirectory,
+			redirect:       true,
 			email:          email,
 			privateKey:     privateKey,
 			client:         oauth2.NewClient(dcontext.Background(), ts),

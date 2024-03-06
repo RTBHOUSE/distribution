@@ -119,6 +119,9 @@ storage:
       token_uri: http://example.com/token_uri
       auth_provider_x509_cert_url: http://example.com/provider_cert_url
       client_x509_cert_url: http://example.com/client_cert_url
+    defaultcredentials:
+      redirect: true
+      email: client@example.com
     rootdirectory: /gcs/object/name/prefix
     chunksize: 5242880
   s3:
@@ -395,6 +398,9 @@ storage:
       token_uri: http://example.com/token_uri
       auth_provider_x509_cert_url: http://example.com/provider_cert_url
       client_x509_cert_url: http://example.com/client_cert_url
+    defaultcredentials:
+      redirect: true
+      email: client@example.com
     rootdirectory: /gcs/object/name/prefix
   s3:
     accesskey: awsaccesskey
